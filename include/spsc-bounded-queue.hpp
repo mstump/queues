@@ -56,18 +56,18 @@ public:
 
     ~spsc_bounded_queue_t()
     {
-        delete _buffer;
+        delete[] _buffer;
     }
 
     bool
     enqueue(
         T& input)
     {
-        std::atomic_thread_fence(std::memory_order_consume);
-        if ((_tail - (_head + 1) & _mask) >= 1) {
-            _buffer[_head & _mask] = input;
-            std::atomic_thread_fence(std::memory_order_acq_rel);
-            _head = _head + 1;
+        const size_t head = _head.load(std::memory_order_relaxed);
+
+        if (((_tail.load(std::memory_order_acquire) - (head + 1)) & _mask) >= 1) {
+            _buffer[head & _mask] = input;
+            _head.store(head + 1, std::memory_order_release);
             return true;
         }
         return false;
@@ -77,14 +77,13 @@ public:
     dequeue(
         T& output)
     {
-        std::atomic_thread_fence(std::memory_order_consume);
-        if (((_head - _tail) & _mask) >= 1) {
+        const size_t tail = _tail.load(std::memory_order_relaxed);
+
+        if (((_head.load(std::memory_order_acquire) - tail) & _mask) >= 1) {
             output = _buffer[_tail & _mask];
-            std::atomic_thread_fence(std::memory_order_release);
-            _tail = _tail + 1;
+            _tail.store(tail + 1, std::memory_order_release);
             return true;
         }
-
         return false;
     }
 
@@ -93,12 +92,12 @@ private:
 
     typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type aligned_t;
 
-    const size_t    _size;
-    const size_t    _mask;
-    T*              _buffer;
-    volatile size_t _head;
-    char            _cache_line[64];
-    volatile size_t _tail;
+    const size_t        _size;
+    const size_t        _mask;
+    T* const            _buffer;
+    std::atomic<size_t> _head;
+    char                _cache_line[64];
+    std::atomic<size_t> _tail;
 
     spsc_bounded_queue_t(const spsc_bounded_queue_t&) {}
     void operator=(const spsc_bounded_queue_t&) {}
