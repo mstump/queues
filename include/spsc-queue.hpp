@@ -39,63 +39,65 @@ class spsc_queue_t
 public:
 
     spsc_queue_t() :
-        _head(reinterpret_cast<buffer_node_t*>(new buffer_node_aligned_t)),
-        _tail(_head.load(std::memory_order_relaxed))
+        _head(reinterpret_cast<node_t*>(new node_aligned_t)),
+        _tail(_head)
     {
-        buffer_node_t* front = _head.load(std::memory_order_relaxed);
-        front->next.store(NULL, std::memory_order_relaxed);
+        _head->next = NULL;
     }
 
     ~spsc_queue_t()
     {
         T output;
         while (this->dequeue(output)) {}
-        buffer_node_t* front = _head.load(std::memory_order_relaxed);
-        delete front;
+        delete _head;
     }
 
     void
     enqueue(
         const T& input)
     {
-        buffer_node_t* node = reinterpret_cast<buffer_node_t*>(new buffer_node_aligned_t);
+        node_t* node = reinterpret_cast<node_t*>(new node_aligned_t);
         node->data = input;
-        node->next.store(NULL, std::memory_order_relaxed);
+        node->next = NULL;
 
-        buffer_node_t* back = _tail.load(std::memory_order_relaxed);
-        back->next.store(node, std::memory_order_release);
-        _tail.store(node, std::memory_order_relaxed);
+        std::atomic_thread_fence(std::memory_order_acq_rel);
+        _head->next = node;
+        _head = node;
     }
 
     bool
     dequeue(
         T& output)
     {
-        buffer_node_t* front = _head.load(std::memory_order_relaxed);
-        buffer_node_t* next = front->next.load(std::memory_order_acquire);
-        if (next == NULL) {
-            // buffer is empty
+        std::atomic_thread_fence(std::memory_order_consume);
+        if (!_tail->next) {
             return false;
         }
-        output = next->data;
-        _head.store(next, std::memory_order_release);
-        delete front;
+
+        output = _tail->next->data;
+        std::atomic_thread_fence(std::memory_order_acq_rel);
+        _back = _tail;
+        _tail = _back->next;
+
+        delete _back;
         return true;
     }
 
 
 private:
 
-    struct buffer_node_t
+    struct node_t
     {
-        std::atomic<buffer_node_t*> next;
-        T                           data;
+        node_t* next;
+        T       data;
     };
 
-    typedef typename std::aligned_storage<sizeof(buffer_node_t), std::alignment_of<buffer_node_t>::value>::type buffer_node_aligned_t;
+    typedef typename std::aligned_storage<sizeof(node_t), std::alignment_of<node_t>::value>::type node_aligned_t;
 
-    std::atomic<buffer_node_t*> _head;
-    std::atomic<buffer_node_t*> _tail;
+    node_t* _head;
+    char    _cache_line[64];
+    node_t* _tail;
+    node_t* _back;
 
     spsc_queue_t(const spsc_queue_t&) {}
     void operator=(const spsc_queue_t&) {}
