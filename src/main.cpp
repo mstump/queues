@@ -44,12 +44,11 @@ producer_func(
     }
 }
 
-template<typename P,
-         typename C>
+template<typename T>
 long double
 run_test(
-    P producer_func,
-    C consumer_func)
+    T producer_func,
+    T consumer_func)
 {
     typedef std::chrono::high_resolution_clock clock_t;
     typedef std::chrono::time_point<clock_t> time_t;
