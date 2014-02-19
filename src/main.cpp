@@ -2,6 +2,7 @@
 #include <thread>
 
 #include "spsc-queue.hpp"
+#include "mpsc-queue.hpp"
 #include "spsc-bounded-queue.hpp"
 #include "mpmc-bounded-queue.hpp"
 
@@ -112,6 +113,22 @@ main()
                                        std::bind(&consumer_func<queue_t>, &queue));
 
         std::cout << "SPSC dynamic queue completed "
+                  << COUNT
+                  << " iterations in "
+                  << seconds
+                  << " seconds. "
+                  << ((long double) COUNT / seconds) / 1000000
+                  << " million enqueue/dequeue pairs per second."
+                  << std::endl;
+    }
+
+    {
+        typedef mpsc_queue_t<size_t> queue_t;
+        queue_t queue;
+        long double seconds = run_test(std::bind(&producer_func<queue_t>, &queue),
+                                       std::bind(&consumer_func<queue_t>, &queue));
+
+        std::cout << "MPSC dynamic queue completed "
                   << COUNT
                   << " iterations in "
                   << seconds
