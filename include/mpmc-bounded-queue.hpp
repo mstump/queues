@@ -23,6 +23,10 @@
 
 // For more information, please refer to <http://unlicense.org/>
 
+// Implementation of Dmitry Vyukov's MPMC algorithm
+// http://www.1024cores.net/home/lock-free-algorithms/queues/bounded-mpmc-queue
+
+
 #ifndef __MPMC_BOUNDED_QUEUE_INCLUDED__
 #define __MPMC_BOUNDED_QUEUE_INCLUDED__
 
@@ -89,8 +93,6 @@ public:
             }
             else {
                 // under normal circumstances this branch should never be taken
-                // the only thing I can think of is if there was a pause between the head and node sequences being fetched and
-                // during that time head_seq was incremented more than once.
                 head_seq = _head_seq.load(std::memory_order_relaxed);
             }
         }
@@ -129,8 +131,7 @@ public:
                 return false;
             }
             else {
-                // this branch should never be taken
-                // something weird happened to _node_seq, it was double incremented
+                // under normal circumstances this branch should never be taken
                 tail_seq = _tail_seq.load(std::memory_order_relaxed);
             }
         }

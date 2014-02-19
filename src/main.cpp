@@ -51,7 +51,6 @@ run_test(
     T producer_func,
     T consumer_func)
 {
-    (void) consumer_func;
     typedef std::chrono::high_resolution_clock clock_t;
     typedef std::chrono::time_point<clock_t> time_t;
     time_t start;
