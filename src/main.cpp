@@ -3,6 +3,7 @@
 
 #include "spsc-queue.hpp"
 #include "spsc-bounded-queue.hpp"
+#include "mpmc-bounded-queue.hpp"
 
 #define COUNT 100000000
 
@@ -50,6 +51,7 @@ run_test(
     T producer_func,
     T consumer_func)
 {
+    (void) consumer_func;
     typedef std::chrono::high_resolution_clock clock_t;
     typedef std::chrono::time_point<clock_t> time_t;
     time_t start;
@@ -88,6 +90,21 @@ main()
                   << std::endl;
     }
 
+    {
+        typedef mpmc_bounded_queue_t<size_t> queue_t;
+        queue_t queue(65536);
+        long double seconds = run_test(std::bind(&bounded_producer_func<queue_t>, &queue),
+                                       std::bind(&consumer_func<queue_t>, &queue));
+
+        std::cout << "MPMC bound queue completed "
+                  << COUNT
+                  << " iterations in "
+                  << seconds
+                  << " seconds. "
+                  << ((long double) COUNT / seconds) / 1000000
+                  << " million enqueue/dequeue pairs per second."
+                  << std::endl;
+    }
 
     {
         typedef spsc_queue_t<size_t> queue_t;
